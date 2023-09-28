@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- See Relax specification: Ghidra/Framework/SoftwareModeling/data/languages/processor_spec.rxg -->
+
+<processor_spec>
+  <programcounter register="PC"/>
+  
+  <register_data>
+	  <register name="R0"/>
+	  <register name="R1"/>
+	  <register name="R2"/>
+	  <register name="R3"/>
+	  <register name="SP"/>
+	  <register name="PSW"/>
+	  <register name="ZERO"/>
+  </register_data>
+  
+  <default_symbols>
+  	<!-- Vectors -->
+  	<symbol name="VEC0" address="ram:0000"/> 
+  	<symbol name="VEC1" address="ram:0002"/>
+  	<symbol name="VEC2" address="ram:0004"/>
+  	<symbol name="VEC3" address="ram:0006"/>
+  	<symbol name="VEC4" address="ram:0008"/>
+  	<symbol name="VEC5" address="ram:000a"/>
+  	<symbol name="VEC6" address="ram:000c"/>
+  	<symbol name="VEC7" address="ram:000e"/>
+  	<symbol name="VEC8" address="ram:0010"/>
+  	<symbol name="VEC9" address="ram:0012"/>
+  	<symbol name="VEC10" address="ram:0014"/>
+  	<symbol name="VEC11" address="ram:0016"/>
+  	<symbol name="VEC12" address="ram:0018"/>
+  	<symbol name="VEC13" address="ram:001a"/>
+  	<symbol name="VEC14" address="ram:001c"/>
+  	<symbol name="VEC15" address="ram:001e"/>
+  	
+ 	<symbol name="VOICE_REG1" address="ram:0020" />
+ 	<symbol name="VOICE_REG2" address="ram:0022" />
+ 	<symbol name="VOICE_REG3" address="ram:0024" />
+ 	<symbol name="VOICE_REG4" address="ram:0026" />
+ 	<symbol name="VOICE_REG5" address="ram:0028" />
+ 	<symbol name="VOICE_REG6" address="ram:002a" />
+ 	<symbol name="VOICE_REG7" address="ram:002c" />
+ 	<symbol name="VOICE_REG8" address="ram:002e" />
+ 	<symbol name="VOICE_REG9" address="ram:0032" />
+ 	<symbol name="VOICE_REG10" address="ram:0034" />
+ 	<symbol name="VOICE_REG11" address="ram:0036" />
+ 	<symbol name="VOICE_REG12" address="ram:0038" />
+ 	<symbol name="VOICE_REG13" address="ram:003a" />
+ 	<symbol name="VOICE_REG14" address="ram:003c" />
+ 	<symbol name="VOICE_REG15" address="ram:003e" />
+ 	<symbol name="VOICE_REG16" address="ram:0040" />
+ 	<symbol name="VOICE_REG17" address="ram:0042" />
+ 	<symbol name="VOICE_REG18" address="ram:0044" />
+ 	<symbol name="VOICE_REG19" address="ram:0046" />
+ 	<symbol name="VOICE_REG20" address="ram:0048" />
+ 	<symbol name="VOICE_REG21" address="ram:004a" />
+ 	<symbol name="VOICE_REG22" address="ram:004c" />
+ 	<symbol name="VOICE_REG23" address="ram:004e" />
+ 	<symbol name="VOICE_REG24" address="ram:0050" />
+ 	<symbol name="VOICE_REG25" address="ram:0052" />
+ 	<symbol name="VOICE_REG26" address="ram:0054" />
+ 	<symbol name="VOICE_REG27" address="ram:0056" />
+ 	<symbol name="VOICE_REG28" address="ram:0058" />
+ 	<symbol name="VOICE_REG29" address="ram:005a" />
+ 	<symbol name="VOICE_REG30" address="ram:005c" />
+ 	<symbol name="VOICE_REG31" address="ram:005e" />
+ 	
+ 	<symbol name="REG_UNK60" address="ram:0060" />
+ 	
+ 	<symbol name="VOICE_SELECT" address="ram:0061" />
+ 	<symbol name="BANK1_SELECT" address="ram:0062" />
+ 	<symbol name="BANK2_SELECT" address="ram:0064" />
+ 	
+ 	<symbol name="MPU041" address="ram:0068" />
+ 	<symbol name="MPU041_ISTATUS" address="ram:0069" />
+ 	<symbol name="MIDI" address="ram:006c" />
+ 	<symbol name="MIDI_STATUS" address="ram:006d" />
+ 	
+ 	<symbol name="IRQEN_76" address="ram:0076" />
+ 	<symbol name="IRQEN_77" address="ram:0077" />
+  </default_symbols>
+
+  <volatile outputop="write_volatile" inputop="read_volatile">
+  	<range space="ram" first="0x20" last="0x7f"/>
+  	<range space="ram" first="0xe000" last="0xffff"/>
+  </volatile>
+</processor_spec>

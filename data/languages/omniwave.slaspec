@@ -1,0 +1,509 @@
+define endian=big;
+define alignment=2;
+
+define space ram      type=ram_space      size=2 default;
+define space register type=register_space size=2;
+
+define pcodeop MAXU;
+define pcodeop MAXS;
+define pcodeop MINU;
+define pcodeop MINS;
+
+
+define token opbyte (16)
+   op14_2     = (14,15)
+   op12_2     = (12,13)
+   op11_3     = (11,13)
+   op0_3      = (0,2)
+
+   bits12_3   = (12,14)
+   bits10_4   = (10,13)
+   bit_11     = (11,11)
+   bit_7      = (7,7)
+   bit_3      = (3,3)
+
+   regd       = (8,10)
+   reg1       = (8,10)
+   reg2       = (4,6)
+
+   op1        = (8,11)
+   op2        = (4,7)
+
+   rel        = (0,9) signed
+
+   op_imm8s   = (0,7) signed
+;
+
+define token data (16)
+    imm8       = (0,7)
+    imm8s      = (0,7) signed
+
+    imm16_sign = (15,15)
+    imm16      = (0,15)
+    imm16s     = (0,15) signed
+;
+
+
+# Some opcodes have 4 bytes and I want to handle those in a special way for formatting, so everything has to be duplicated to take that into account
+define token opbyte_long (32)
+    op14_2_long     = (30,31)
+    op12_2_long     = (28,29)
+    op11_3_long     = (27,29)
+    op0_3_long      = (16,18)
+
+    bit_7_long      = (23,23)
+    bit_3_long      = (19,19)
+
+    regd_long       = (24,26)
+    reg1_long       = (24,26)
+    reg2_long       = (20,22)
+
+    op2_long        = (20,23)
+
+    imm16_sign_long = (15,15)
+    imm16_long      = (0,15)
+    imm16s_long     = (0,15) signed
+;
+
+
+define register offset=0x00 size=2 [ R0 R1 R2 R3 SP PSW PC ZERO ];
+
+attach variables [ reg1 reg2 regd reg1_long reg2_long regd_long ] [ R0 R1 R2 R3 SP PSW PC ZERO ];
+
+@define Z_flag "PSW[4,1]"  # Z: Zero
+@define C_flag "PSW[5,1]"  # C: Carry
+@define N_flag "PSW[6,1]"  # N: Negative
+@define V_flag "PSW[7,1]"  # V: Overflow
+@define I_flag "PSW[15,1]" # I: IRQ
+
+#######
+
+IMM16: imm16 is imm16 { local c:2 = imm16; export c; }
+IMM16S: imm16s is imm16s { local c:2 = imm16s; export c; }
+IMM8: imm8 is imm8 { local c:2 = zext(imm8:1); export c; }
+IMM8S: imm8s is imm8s { local c:2 = sext(imm8s:1); export c; }
+
+OP_IMM8S: op_imm8s is op_imm8s { local c:2 = sext(op_imm8s:1); export c; }
+
+REL: reloc is rel [ reloc = inst_next + rel; ] { export *:2 reloc; }
+ADDR: imm16 is imm16 { export *:2 imm16; }
+
+#######
+
+REGD: regd is regd { export regd; }
+
+REG1: reg1 is reg1 { export reg1; }
+REG1: 0 is reg1 & reg1=7 { export 0:2; }
+
+REG2: reg2 is reg2 { export reg2; }
+REG2: 0 is reg2 & reg2=7 { export 0:2; }
+
+REG2S: REG2".w" is REG2 & bit_3=1 { export REG2; }
+REG2S: REG2".bu" is REG2 & bit_3=0 & bit_7=0 { local c:2 = zext(REG2); export c; }
+REG2S: REG2".bs" is REG2 & bit_3=0 & bit_7=1 { local c:2 = sext(REG2); export c; }
+
+REGBASE_PTR: "("REG2").w" is REG2 & bit_3=1 { export *:2 REG2; }
+REGBASE_PTR: "("REG2").bu" is REG2 & bit_3=0 & bit_7=0 { local c:2 = zext(*:1 REG2); export c; }
+REGBASE_PTR: "("REG2").bs" is REG2 & bit_3=0 & bit_7=1 { local c:2 = sext(*:1 REG2); export c; }
+
+#######
+
+REGD_LONG: regd_long is regd_long { export regd_long; }
+
+REG1_LONG: reg1_long is reg1_long { export reg1_long; }
+REG1_LONG: 0 is reg1_long=7 { export 0:2; }
+
+REG2_LONG: reg2_long is reg2_long { export reg2_long; }
+REG2_LONG: 0 is reg2_long=7 { export 0:2; }
+
+REG1_OFFSET_ADDR_WORD: "("imm16_long").w" is reg1_long=7 & bit_3_long=1 & imm16_long { local c:2 = imm16_long:2; export c; }
+REG1_OFFSET_ADDR_BYTE: "("imm16_long").bu" is reg1_long=7 & bit_3_long=0 & bit_7_long=0 & imm16_long { local c:2 = imm16_long:2; export c; }
+REG1_OFFSET_ADDR_BYTE: "("imm16_long").bs" is reg1_long=7 & bit_3_long=0 & bit_7_long=1 & imm16_long { local c:2 = imm16_long:2; export c; }
+REG1_OFFSET_ADDR_WORD: "("reg1_long"+"imm16s_long").w" is reg1_long & bit_3_long=1 & imm16s_long { local c:2 = reg1_long:2+imm16s_long:2; export c; }
+REG1_OFFSET_ADDR_BYTE: "("reg1_long"+"imm16s_long").bu" is reg1_long & bit_3_long=0 & bit_7_long=0 & imm16s_long { local c:2 = reg1_long:2+imm16s_long:2; export c; }
+REG1_OFFSET_ADDR_BYTE: "("reg1_long"+"imm16s_long").bs" is reg1_long & bit_3_long=0 & bit_7_long=1 & imm16s_long { local c:2 = reg1_long:2+imm16s_long:2; export c; }
+REG1_OFFSET_ADDR_WORD: "("reg1_long""imm16s_long").w" is reg1_long & bit_3_long=1 & imm16_sign_long=1 & imm16s_long { local c:2 = reg1_long:2+imm16s_long:2; export c; }
+REG1_OFFSET_ADDR_BYTE: "("reg1_long""imm16s_long").bu" is reg1_long & bit_3_long=0 & bit_7_long=0 & imm16_sign_long=1 & imm16s_long { local c:2 = reg1_long:2+imm16s_long:2; export c; }
+REG1_OFFSET_ADDR_BYTE: "("reg1_long""imm16s_long").bs" is reg1_long & bit_3_long=0 & bit_7_long=1 & imm16_sign_long=1 & imm16s_long { local c:2 = reg1_long:2+imm16s_long:2; export c; }
+
+REGBASE_OFFSET_PTR: "("imm16_long").w" is reg2_long=7 & bit_3_long=1 & imm16_long { local c:2 = *:2 (imm16_long:2); export c; }
+REGBASE_OFFSET_PTR: "("imm16_long").bu" is reg2_long=7 & bit_3_long=0 & bit_7_long=0 & imm16_long { local c:2 = zext(*:1 (imm16_long:2)); export c; }
+REGBASE_OFFSET_PTR: "("imm16_long").bs" is reg2_long=7 & bit_3_long=0 & bit_7_long=1 & imm16_long { local c:2 = sext(*:1 (imm16_long:2)); export c; }
+REGBASE_OFFSET_PTR: "("reg2_long"+"imm16s_long").w" is reg2_long & bit_3_long=1 & imm16s_long { local c:2 = *:2 (reg2_long:2+imm16s_long:2); export c; }
+REGBASE_OFFSET_PTR: "("reg2_long"+"imm16s_long").bu" is reg2_long & bit_3_long=0 & bit_7_long=0 & imm16s_long { local c:2 = zext(*:1 (reg2_long:2+imm16s_long:2)); export c; }
+REGBASE_OFFSET_PTR: "("reg2_long"+"imm16s_long").bs" is reg2_long & bit_3_long=0 & bit_7_long=1 & imm16s_long { local c:2 = sext(*:1 (reg2_long:2+imm16s_long:2)); export c; }
+REGBASE_OFFSET_PTR: "("reg2_long""imm16s_long").w" is reg2_long & bit_3_long=1 & imm16_sign_long=1 & imm16s_long { local c:2 = *:2 (reg2_long:2+imm16s_long:2); export c; }
+REGBASE_OFFSET_PTR: "("reg2_long""imm16s_long").bu" is reg2_long & bit_3_long=0 & bit_7_long=0 & imm16_sign_long=1 & imm16s_long { local c:2 = zext(*:1 (reg2_long:2+imm16s_long:2)); export c; }
+REGBASE_OFFSET_PTR: "("reg2_long""imm16s_long").bs" is reg2_long & bit_3_long=0 & bit_7_long=1 & imm16_sign_long=1 & imm16s_long { local c:2 = sext(*:1 (reg2_long:2+imm16s_long:2)); export c; }
+
+#######
+
+macro push16(val16) {
+    SP = SP - 2;
+    *:2(SP) = val16;
+}
+
+macro pop16(ret16) {
+    ret16 = *:2(SP);
+    SP = SP + 2;
+}
+
+macro performBitTest(a, b) {
+    $(Z_flag) = (a & (1 << b)) == 0;
+}
+
+macro calculateStatusFlags(a) {
+    $(N_flag) = a s< 0;
+    $(Z_flag) = a == 0;
+}
+
+macro performAddOp(dest, a, b) {
+    local tmp:2 = a + b;
+    calculateStatusFlags(tmp);
+    $(C_flag) = scarry(a, b);
+    $(V_flag) = sborrow(a, b);
+    dest = tmp;
+}
+
+macro performSubOp(dest, a, b) {
+    local tmp:2 = a - b;
+    calculateStatusFlags(tmp);
+    $(C_flag) = a s< b;
+    $(V_flag) = sborrow(a, b);
+    dest = tmp;
+}
+
+macro performCmpOp(a, b) {
+    local tmp:2;
+    performSubOp(tmp, a, b);
+    calculateStatusFlags(tmp);
+}
+
+macro performXorOp(dest, a, b) {
+    dest = a ^ b;
+    calculateStatusFlags(dest);
+}
+
+macro performOrOp(dest, a, b) {
+    dest = a | b;
+    calculateStatusFlags(dest);
+}
+
+macro performAndOp(dest, a, b) {
+    dest = a & b;
+    calculateStatusFlags(dest);
+}
+
+macro performMulOp(dest, a, b) {
+    dest = a * b;
+    calculateStatusFlags(dest);
+}
+
+macro performRolOp(dest, a, b) {
+    dest = (a << b) | (a >> (16 - b));
+    calculateStatusFlags(dest);
+}
+
+macro performRorOp(dest, a, b) {
+    dest = (a >> b) | (a << (16 - b));
+    calculateStatusFlags(dest);
+}
+
+macro performBitSetOp(dest, a, b) {
+    performBitTest(a, b);
+    dest = a | (1 << b);
+}
+
+macro performBitClearOp(dest, a, b) {
+    performBitTest(a, b);
+    dest = a & ~(1 << b);
+}
+
+
+#######
+
+
+:BNE REL is op14_2=0x0 & bits10_4=0x0 & REL {
+    if (!$(Z_flag))
+        goto REL;
+}
+
+:BEQ REL is op14_2=0x0 & bits10_4=0x1 & REL {
+    if ($(Z_flag))
+        goto REL;
+}
+
+:BGEU REL is op14_2=0x0 & bits10_4=0x2 & REL {
+    if (!$(C_flag))
+        goto REL;
+}
+
+:BLTU REL is op14_2=0x0 & bits10_4=0x3 & REL {
+    if ($(C_flag))
+        goto REL;
+}
+
+:BPL REL is op14_2=0x0 & bits10_4=0x4 & REL {
+    if (!$(N_flag))
+        goto REL;
+}
+
+:BMI REL is op14_2=0x0 & bits10_4=0x5 & REL {
+    if ($(N_flag))
+        goto REL;
+}
+
+:BVC REL is op14_2=0x0 & bits10_4=0x6 & REL {
+    if (!$(V_flag))
+        goto REL;
+}
+
+:BVS REL is op14_2=0x0 & bits10_4=0x7 & REL {
+    if ($(V_flag))
+        goto REL;
+}
+
+:BNV REL is op14_2=0x0 & bits10_4=0x8 & REL {
+    # How does this work?
+}
+
+:BGTU REL is op14_2=0x0 & bits10_4=0x9 & REL {
+    if (!$(Z_flag) && !$(C_flag))
+        goto REL;
+}
+
+:BLEU REL is op14_2=0x0 & bits10_4=0xa & REL {
+    if ($(Z_flag) || $(C_flag))
+        goto REL;
+}
+
+:BGTS REL is op14_2=0x0 & bits10_4=0xb & REL {
+    if ((($(Z_flag) == 0) && ($(N_flag) != 0) && ($(V_flag) != 0)) || (($(Z_flag) == 0) && ($(V_flag) == 0) && ($(N_flag) == 0)))
+        goto REL;
+}
+
+:BLES REL is op14_2=0x0 & bits10_4=0xc & REL {
+    if (($(Z_flag) != 0) || (($(N_flag) != 0) && ($(V_flag) == 0)) || (($(V_flag) != 0) && ($(N_flag) == 0)))
+        goto REL;
+}
+:BGES REL is op14_2=0x0 & bits10_4=0xd & REL {
+    if ((($(N_flag) != 0) && ($(V_flag) != 0)) || (($(V_flag) == 0) && ($(N_flag) == 0)))
+        goto REL;
+}
+:BLTS REL is op14_2=0x0 & bits10_4=0xe & REL {
+    if ((($(N_flag) != 0) && ($(V_flag) == 0)) || (($(V_flag) != 0) && ($(N_flag) == 0)))
+        goto REL;
+}
+
+:BRA REL is op14_2=0x0 & bits10_4=0xf & REL { goto REL; }
+
+# Data move with pre/post incrementation
+:MOV "("REG1")+.w", REG2 is op14_2=0x3 & op12_2=0x0 & op0_3=0x0 & bit_11=0 & bit_7=0 & bit_3=1 & REG1 & REG2 { *:2(REG1) = REG2; REG1 = REG1 + 2; }
+:MOV "-("REG1").w", REG2 is op14_2=0x3 & op12_2=0x0 & op0_3=0x0 & bit_11=1 & bit_7=0 & bit_3=0 & REG1 & REG2 { REG1 = REG1 - 2; *:2(REG1) = REG2; }
+
+:MOV REGD, "("REG2")+.w" is op14_2=0x3 & op12_2=0x0 & op0_3=0x2 & bit_11=0 & bit_7=0 & bit_3=1 & REGD & REG2 { REGD = *:2 REG2; REG2 = REG2 + 2; }
+:MOV REGD, "-("REG2").w" is op14_2=0x3 & op12_2=0x0 & op0_3=0x2 & bit_11=1 & bit_7=0 & bit_3=0 & REGD & REG2 { REG2 = REG2 - 2; REGD = *:2 REG2; }
+
+# Write memory indexed
+:MOV "("REG1").b", REG2 is op14_2=0x3 & op12_2=0x2 & op0_3=0x6 & bit_3=0 & REG1 & REG2 { *:1(REG1) = REG2:1; }
+:MOV "("REG1").w", REG2 is op14_2=0x3 & op12_2=0x2 & op0_3=0x6 & bit_3=1 & REG1 & REG2 { *:2(REG1) = REG2; }
+
+# Write memory indexed and offset
+:MOV REG1_OFFSET_ADDR_BYTE, REG2_LONG is op14_2_long=0x3 & op12_2_long=0x2 & op0_3_long=0x7 & REG1_OFFSET_ADDR_BYTE & REG2_LONG { *:1 REG1_OFFSET_ADDR_BYTE = REG2_LONG:1; }
+:MOV REG1_OFFSET_ADDR_WORD, REG2_LONG is op14_2_long=0x3 & op12_2_long=0x2 & op0_3_long=0x7 & REG1_OFFSET_ADDR_WORD & REG2_LONG { *:2 REG1_OFFSET_ADDR_WORD = REG2_LONG; }
+
+# Min/max with immediate
+# Are these meant to set status flags?
+:MAXU REG1, REG2, IMM16 is op14_2=0x3 & op12_2=0x1 & op0_3=0x0 & bit_11=0 & bit_7=0 & bit_3=1 & REG1 & REG2; IMM16 { REG1 = MAXU(REG2, IMM16); }
+:MAXS REG1, REG2, IMM16S is op14_2=0x3 & op12_2=0x1 & op0_3=0x0 & bit_11=0 & bit_7=1 & bit_3=1 & REG1 & REG2; IMM16S { REG1 = MAXS(REG2, IMM16S); }
+:MINU REG1, REG2, IMM16 is op14_2=0x3 & op12_2=0x1 & op0_3=0x0 & bit_11=1 & bit_7=0 & bit_3=1 & REG1 & REG2; IMM16 { REG1 = MINU(REG2, IMM16); }
+:MINS REG1, REG2, IMM16S is op14_2=0x3 & op12_2=0x1 & op0_3=0x0 & bit_11=1 & bit_7=1 & bit_3=1 & REG1 & REG2; IMM16S { REG1 = MINS(REG2, IMM16S); }
+
+# Bit test in register
+:BTST REG1, op2 is op14_2=0x3 & op12_2=0x2 & op0_3=0x0 & REG1 & op2 { performBitTest(REG1, op2); }
+
+# Bit test from memory indexed
+:BTST "("REG1").b", op2 is op14_2=0x3 & op12_2=0x2 & op0_3=0x2 & bit_3=0 & REG1 & op2 { local val:2 = zext(*:1 REG1); performBitTest(val, op2); }
+:BTST "("REG1").w", op2 is op14_2=0x3 & op12_2=0x2 & op0_3=0x2 & bit_3=1 & REG1 & op2 { local val:2 = *:2 REG1; performBitTest(val, op2); }
+
+# Bit test from memory indexed and offset
+:BTST REG1_OFFSET_ADDR_WORD, op2_long is op14_2_long=0x3 & op12_2_long=0x2 & op0_3_long=0x3 & REG1_OFFSET_ADDR_WORD & op2_long { local val:2 = *:2 REG1_OFFSET_ADDR_WORD; performBitTest(val, op2_long); }
+:BTST REG1_OFFSET_ADDR_BYTE, op2_long is op14_2_long=0x3 & op12_2_long=0x2 & op0_3_long=0x3 & REG1_OFFSET_ADDR_BYTE & op2_long { local val:2 = zext(*:1 REG1_OFFSET_ADDR_BYTE); performBitTest(val, op2_long); }
+
+# Bit set in register
+:BSET REGD, REG1, op2 is op14_2=0x3 & op12_2=0x2 & op0_3=0x1 & REGD & REG1 & op2 { performBitSetOp(REGD, REG1, op2); }
+
+# Bit clear in register
+:BCLR REGD, REG1, op2 is op14_2=0x3 & op12_2=0x2 & op0_3=0x4 & REGD & REG1 & op2 { performBitClearOp(REGD, REG1, op2); }
+
+# Push all registers
+:PUSHALL is op14_2=0x3 & op12_2=0 & op0_3=0x1 {
+    push16(R0);
+    push16(R1);
+    push16(R2);
+    push16(R3);
+}
+
+# Pop all registers
+:POPALL is op14_2=0x3 & op12_2=0 & op0_3=0x3 {
+    pop16(R3);
+    pop16(R2);
+    pop16(R1);
+    pop16(R0);
+}
+
+# Absolute jump
+:JMP ADDR is op14_2=0x3 & op12_2=0x1 & op0_3=0x1; ADDR { goto ADDR; }
+
+# Absolute subroutine call
+:JSR ADDR is op14_2=0x3 & op12_2=0x1 & op0_3=0x2; ADDR { call ADDR; }
+
+# Return from subroutine
+:RTS is op14_2=0x3 & op12_2=0x1 & op0_3=0x3 { return [PC]; }
+
+# Return from interrupt
+:RTI is op14_2=0x3 & op12_2=0x1 & op0_3=0x4 { return [PC]; }
+
+# Decrement and branch
+:DBRA REG1, ADDR is op14_2=0x3 & op12_2=0x3 & op0_3=0x4 & REG1; ADDR {
+    # Doesn't change flags?
+    REG1 = REG1 - 1;
+
+    if (REG1 != 0)
+        goto ADDR;
+}
+
+# Compare with immediate and branch if equal
+:CMPBEQ REG1, IMM16, ADDR is op14_2=0x3 & op12_2=0x3 & op0_3=0x5 & REG1; IMM16; ADDR {
+    performCmpOp(REG1, IMM16);
+
+    if ($(Z_flag))
+        goto ADDR;
+}
+
+# Unsigned shifts
+:SHL REGD, REG1, op2 is op14_2=0x3 & op12_2=0x0 & op0_3=0x4 & bit_11=0 & REGD & REG1 & op2 {
+    $(C_flag) = (REG1 & (1 << (16 - op2))) != 0;
+    REGD = REG1 << op2;
+    calculateStatusFlags(REGD);
+}
+:SHR REGD, REG1, op2 is op14_2=0x3 & op12_2=0x0 & op0_3=0x4 & bit_11=1 & REGD & REG1 & op2 {
+    $(C_flag) = (REG1 & (1 << (op2 - 1))) != 0;
+    REGD = REG1 >> op2;
+    calculateStatusFlags(REGD);
+}
+
+# Signed shifts
+:SHLS REGD, REG1, op2 is op14_2=0x3 & op12_2=0x0 & op0_3=0x5 & bit_11=0 & REGD & REG1 & op2 {
+    $(C_flag) = (REG1 & (1 << (op2 - 1))) != 0;
+    REGD = REG1 << op2;
+    calculateStatusFlags(REGD);
+}
+:SHRS REGD, REG1, op2 is op14_2=0x3 & op12_2=0x0 & op0_3=0x5 & bit_11=1 & REGD & REG1 & op2 {
+    $(C_flag) = (REG1 & (1 << (16 - op2))) != 0;
+    REGD = REG1 s>> op2;
+    calculateStatusFlags(REGD);
+}
+
+# Rotate
+:ROL REGD, REG1, op2 is op14_2=0x3 & op12_2=0x0 & op0_3=0x6 & bit_11=0 & REGD & REG1 & op2 { performRolOp(REGD, REG1, op2); }
+:ROR REGD, REG1, op2 is op14_2=0x3 & op12_2=0x0 & op0_3=0x6 & bit_11=1 & REGD & REG1 & op2 { performRorOp(REGD, REG1, op2); }
+
+# Rotate through carry
+:RCL REGD, REG1, op2 is op14_2=0x3 & op12_2=0x0 & op0_3=0x7 & bit_11=0 & REGD & REG1 & op2 {
+    local v1:4 = zext(REG1) | sext(0x10000 * $(C_flag));
+    $(C_flag) = (v1 & (1 << (op2 - 1))) != 0;
+    REGD = trunc(((v1 << op2) | (v1 >> (17 - op2))));
+    calculateStatusFlags(REGD);
+}
+:RCR REGD, REG1, op2 is op14_2=0x3 & op12_2=0x0 & op0_3=0x7 & bit_11=1 & REGD & REG1 & op2 {
+    local v1:4 = zext(REG1) | sext(0x10000 * $(C_flag));
+    $(C_flag) = (v1 & (1 << (16 - op2))) != 0;
+    REGD = trunc(((v1 >> op2) | (v1 << (17 - op2))));
+    calculateStatusFlags(REGD);
+}
+
+# Neg/not
+:NOT REGD, REG2 is op14_2=0x3 & op12_2=0x1 & op0_3=0x5 & bit_7=0 & REGD & REG2 { REGD = ~REG2; calculateStatusFlags(REGD); }
+:NEG REGD, REG2 is op14_2=0x3 & op12_2=0x1 & op0_3=0x5 & bit_7=1 & REGD & REG2 { REGD = -REG2; calculateStatusFlags(REGD); }
+
+# ALU functions with 8-bit immediate
+:ADD REGD, REG1, OP_IMM8S is op14_2=0x1 & op11_3=0x0 & REGD & REG1 & OP_IMM8S { performAddOp(REGD, REG1, OP_IMM8S); }
+:SUB REGD, REG1, OP_IMM8S is op14_2=0x1 & op11_3=0x1 & REGD & REG1 & OP_IMM8S { performSubOp(REGD, REG1, OP_IMM8S); }
+:CMP REG1, OP_IMM8S is op14_2=0x1 & op11_3=0x2 & REG1 & OP_IMM8S { performCmpOp(REG1, OP_IMM8S); }
+:AND REGD, REG1, OP_IMM8S is op14_2=0x1 & op11_3=0x3 & REGD & REG1 & OP_IMM8S { performAndOp(REGD, REG1, OP_IMM8S); }
+:OR REGD, REG1, OP_IMM8S is op14_2=0x1 & op11_3=0x4 & REGD & REG1 & OP_IMM8S { performOrOp(REGD, REG1, OP_IMM8S); }
+:XOR REGD, REG1, OP_IMM8S is op14_2=0x1 & op11_3=0x5 & REGD & REG1 & OP_IMM8S { performXorOp(REGD, REG1, OP_IMM8S); }
+:MOV REGD, REG1, OP_IMM8S is op14_2=0x1 & op11_3=0x6 & REGD & REG1 & OP_IMM8S { REGD = OP_IMM8S; calculateStatusFlags(REGD); }
+:MUL REGD, REG1, OP_IMM8S is op14_2=0x1 & op11_3=0x7 & REGD & REG1 & OP_IMM8S { performMulOp(REGD, REG1, OP_IMM8S); }
+
+# ALU functions with other register
+:ADD REGD, REG1, REG2S is op14_2=0x2 & op11_3=0x0 & op0_3=0x4 & REGD & REG1 & REG2S { performAddOp(REGD, REG1, REG2S); }
+:SUB REGD, REG1, REG2S is op14_2=0x2 & op11_3=0x1 & op0_3=0x4 & REGD & REG1 & REG2S { performSubOp(REGD, REG1, REG2S); }
+:CMP REG1, REG2S is op14_2=0x2 & op11_3=0x2 & op0_3=0x4 & REG1 & REG2S { performCmpOp(REG1, REG2S); }
+:AND REGD, REG1, REG2S is op14_2=0x2 & op11_3=0x3 & op0_3=0x4 & REGD & REG1 & REG2S { performAndOp(REGD, REG1, REG2S); }
+:OR REGD, REG1, REG2S is op14_2=0x2 & op11_3=0x4 & op0_3=0x4 & REGD & REG1 & REG2S { performOrOp(REGD, REG1, REG2S); }
+:XOR REGD, REG1, REG2S is op14_2=0x2 & op11_3=0x5 & op0_3=0x4 & REGD & REG1 & REG2S { performXorOp(REGD, REG1, REG2S); }
+:MOV REGD, REG2S is op14_2=0x2 & op11_3=0x6 & op0_3=0x4 & REGD & REG2S { REGD = REG2S; calculateStatusFlags(REGD); }
+:MUL REGD, REG1, REG2S is op14_2=0x2 & op11_3=0x7 & op0_3=0x4 & REGD & REG1 & REG2S { performMulOp(REGD, REG1, REG2S); }
+
+# ALU functions with immediate
+:ADD REGD, REG1, IMM8 is op14_2=0x2 & op11_3=0x0 & op0_3=0x5 & bit_3=0 & bit_7=0 & REGD & REG1; IMM8 { performAddOp(REGD, REG1, IMM8); }
+:ADD REGD, REG1, IMM16 is op14_2=0x2 & op11_3=0x0 & op0_3=0x5 & bit_3=1 & bit_7=0 & REGD & REG1; IMM16 { performAddOp(REGD, REG1, IMM16); }
+:ADDS REGD, REG1, IMM8S is op14_2=0x2 & op11_3=0x0 & op0_3=0x5 & bit_3=0 & bit_7=1 & REGD & REG1; IMM8S { performAddOp(REGD, REG1, IMM8S); }
+:ADDS REGD, REG1, IMM16S is op14_2=0x2 & op11_3=0x0 & op0_3=0x5 & bit_3=1 & bit_7=1 & REGD & REG1; IMM16S { performAddOp(REGD, REG1, IMM16S); }
+
+:SUB REGD, REG1, IMM8 is op14_2=0x2 & op11_3=0x1 & op0_3=0x5 & bit_3=0 & bit_7=0 & REGD & REG1; IMM8 { performSubOp(REGD, REG1, IMM8); }
+:SUB REGD, REG1, IMM16 is op14_2=0x2 & op11_3=0x1 & op0_3=0x5 & bit_3=1 & bit_7=0 & REGD & REG1; IMM16 { performSubOp(REGD, REG1, IMM16); }
+:SUBS REGD, REG1, IMM8S is op14_2=0x2 & op11_3=0x1 & op0_3=0x5 & bit_3=0 & bit_7=1 & REGD & REG1; IMM8S { performSubOp(REGD, REG1, IMM8S); }
+:SUBS REGD, REG1, IMM16S is op14_2=0x2 & op11_3=0x1 & op0_3=0x5 & bit_3=1 & bit_7=1 & REGD & REG1; IMM16S { performSubOp(REGD, REG1, IMM16S); }
+
+:CMP REG1, IMM8 is op14_2=0x2 & op11_3=0x2 & op0_3=0x5 & bit_3=0 & bit_7=0 & REGD & REG1; IMM8 { performCmpOp(REG1, IMM8); }
+:CMP REG1, IMM16 is op14_2=0x2 & op11_3=0x2 & op0_3=0x5 & bit_3=1 & bit_7=0 & REGD & REG1; IMM16 { performCmpOp(REG1, IMM16); }
+:CMPS REG1, IMM8S is op14_2=0x2 & op11_3=0x2 & op0_3=0x5 & bit_3=0 & bit_7=1 & REGD & REG1; IMM8S { performCmpOp(REG1, IMM8S); }
+:CMPS REG1, IMM16S is op14_2=0x2 & op11_3=0x2 & op0_3=0x5 & bit_3=1 & bit_7=1 & REGD & REG1; IMM16S { performCmpOp(REG1, IMM16S); }
+
+:AND REGD, REG1, IMM8 is op14_2=0x2 & op11_3=0x3 & op0_3=0x5 & bit_3=0 & bit_7=0 & REGD & REG1; IMM8 { performAndOp(REGD, REG1, IMM8); }
+:AND REGD, REG1, IMM16 is op14_2=0x2 & op11_3=0x3 & op0_3=0x5 & bit_3=1 & bit_7=0 & REGD & REG1; IMM16 { performAndOp(REGD, REG1, IMM16); }
+:ANDS REGD, REG1, IMM8S is op14_2=0x2 & op11_3=0x3 & op0_3=0x5 & bit_3=0 & bit_7=1 & REGD & REG1; IMM8S { performAndOp(REGD, REG1, IMM8S); }
+:ANDS REGD, REG1, IMM16S is op14_2=0x2 & op11_3=0x3 & op0_3=0x5 & bit_3=1 & bit_7=1 & REGD & REG1; IMM16S { performAndOp(REGD, REG1, IMM16S); }
+
+:OR REGD, REG1, IMM8 is op14_2=0x2 & op11_3=0x4 & op0_3=0x5 & bit_3=0 & bit_7=0 & REGD & REG1; IMM8 { performOrOp(REGD, REG1, IMM8); }
+:OR REGD, REG1, IMM16 is op14_2=0x2 & op11_3=0x4 & op0_3=0x5 & bit_3=1 & bit_7=0 & REGD & REG1; IMM16 { performOrOp(REGD, REG1, IMM16); }
+:ORS REGD, REG1, IMM8S is op14_2=0x2 & op11_3=0x4 & op0_3=0x5 & bit_3=0 & bit_7=1 & REGD & REG1; IMM8S { performOrOp(REGD, REG1, IMM8S); }
+:ORS REGD, REG1, IMM16S is op14_2=0x2 & op11_3=0x4 & op0_3=0x5 & bit_3=1 & bit_7=1 & REGD & REG1; IMM16S { performOrOp(REGD, REG1, IMM16S); }
+
+:XOR REGD, REG1, IMM8 is op14_2=0x2 & op11_3=0x5 & op0_3=0x5 & bit_3=0 & bit_7=0 & REGD & REG1; IMM8 { performXorOp(REGD, REG1, IMM8); }
+:XOR REGD, REG1, IMM16 is op14_2=0x2 & op11_3=0x5 & op0_3=0x5 & bit_3=1 & bit_7=0 & REGD & REG1; IMM16 { performXorOp(REGD, REG1, IMM16); }
+:XORS REGD, REG1, IMM8S is op14_2=0x2 & op11_3=0x5 & op0_3=0x5 & bit_3=0 & bit_7=1 & REGD & REG1; IMM8S { performXorOp(REGD, REG1, IMM8S); }
+:XORS REGD, REG1, IMM16S is op14_2=0x2 & op11_3=0x5 & op0_3=0x5 & bit_3=1 & bit_7=1 & REGD & REG1; IMM16S { performXorOp(REGD, REG1, IMM16S); }
+
+:MOV REGD, IMM8 is op14_2=0x2 & op11_3=0x6 & op0_3=0x5 & bit_3=0 & bit_7=0 & REGD; IMM8 { REGD = IMM8; calculateStatusFlags(REGD); }
+:MOV REGD, IMM16 is op14_2=0x2 & op11_3=0x6 & op0_3=0x5 & bit_3=1 & bit_7=0 & REGD; IMM16 { REGD = IMM16; calculateStatusFlags(REGD); }
+:MOVS REGD, IMM8S is op14_2=0x2 & op11_3=0x6 & op0_3=0x5 & bit_3=0 & bit_7=1 & REGD; IMM8S { REGD = IMM8S; calculateStatusFlags(REGD); }
+:MOVS REGD, IMM16S is op14_2=0x2 & op11_3=0x6 & op0_3=0x5 & bit_3=1 & bit_7=1 & REGD; IMM16S { REGD = IMM16S; calculateStatusFlags(REGD); }
+
+:MUL REGD, REG1, IMM8 is op14_2=0x2 & op11_3=0x7 & op0_3=0x5 & bit_3=0 & bit_7=0 & REGD & REG1; IMM8 { performMulOp(REGD, REG1, IMM8); }
+:MUL REGD, REG1, IMM16 is op14_2=0x2 & op11_3=0x7 & op0_3=0x5 & bit_3=1 & bit_7=0 & REGD & REG1; IMM16 { performMulOp(REGD, REG1, IMM16); }
+:MULS REGD, REG1, IMM8S is op14_2=0x2 & op11_3=0x7 & op0_3=0x5 & bit_3=0 & bit_7=1 & REGD & REG1; IMM8S { performMulOp(REGD, REG1, IMM8S); }
+:MULS REGD, REG1, IMM16S is op14_2=0x2 & op11_3=0x7 & op0_3=0x5 & bit_3=1 & bit_7=1 & REGD & REG1; IMM16S { performMulOp(REGD, REG1, IMM16S); }
+
+# ALU functions from memory indexed
+:ADD REGD, REG1, REGBASE_PTR is op14_2=0x2 & op11_3=0x0 & op0_3=0x6 & REGD & REG1 & REGBASE_PTR { performAddOp(REGD, REG1, REGBASE_PTR); }
+:SUB REGD, REG1, REGBASE_PTR is op14_2=0x2 & op11_3=0x1 & op0_3=0x6 & REGD & REG1 & REGBASE_PTR { performSubOp(REGD, REG1, REGBASE_PTR); }
+:CMP REG1, REGBASE_PTR is op14_2=0x2 & op11_3=0x2 & op0_3=0x6 & REG1 & REGBASE_PTR { performCmpOp(REG1, REGBASE_PTR); }
+:AND REGD, REG1, REGBASE_PTR is op14_2=0x2 & op11_3=0x3 & op0_3=0x6 & REGD & REG1 & REGBASE_PTR { performAndOp(REGD, REG1, REGBASE_PTR); }
+:OR REGD, REG1, REGBASE_PTR is op14_2=0x2 & op11_3=0x4 & op0_3=0x6 & REGD & REG1 & REGBASE_PTR { performOrOp(REGD, REG1, REGBASE_PTR); }
+:XOR REGD, REG1, REGBASE_PTR is op14_2=0x2 & op11_3=0x5 & op0_3=0x6 & REGD & REG1 & REGBASE_PTR { performXorOp(REGD, REG1, REGBASE_PTR); }
+:MOV REGD, REGBASE_PTR is op14_2=0x2 & op11_3=0x6 & op0_3=0x6 & REGD & REG1 & REGBASE_PTR { REGD = REGBASE_PTR; calculateStatusFlags(REGD); }
+:MUL REGD, REG1, REGBASE_PTR is op14_2=0x2 & op11_3=0x7 & op0_3=0x6 & REGD & REG1 & REGBASE_PTR { performMulOp(REGD, REG1, REGBASE_PTR); }
+
+# ALU functions from memory indexed and offset
+:ADD REGD_LONG, REG1_LONG, REGBASE_OFFSET_PTR is op14_2_long=0x2 & op11_3_long=0x0 & op0_3_long=0x7 & REGD_LONG & REG1_LONG & REGBASE_OFFSET_PTR { performAddOp(REGD_LONG, REG1_LONG, REGBASE_OFFSET_PTR); }
+:SUB REGD_LONG, REG1_LONG, REGBASE_OFFSET_PTR is op14_2_long=0x2 & op11_3_long=0x1 & op0_3_long=0x7 & REGD_LONG & REG1_LONG & REGBASE_OFFSET_PTR { performSubOp(REGD_LONG, REG1_LONG, REGBASE_OFFSET_PTR); }
+:CMP REG1_LONG, REGBASE_OFFSET_PTR is op14_2_long=0x2 & op11_3_long=0x2 & op0_3_long=0x7 & REG1_LONG & REGBASE_OFFSET_PTR { performCmpOp(REG1_LONG, REGBASE_OFFSET_PTR); }
+:AND REGD_LONG, REG1_LONG, REGBASE_OFFSET_PTR is op14_2_long=0x2 & op11_3_long=0x3 & op0_3_long=0x7 & REGD_LONG & REG1_LONG & REGBASE_OFFSET_PTR { performAndOp(REGD_LONG, REG1_LONG, REGBASE_OFFSET_PTR); }
+:OR REGD_LONG, REG1_LONG, REGBASE_OFFSET_PTR is op14_2_long=0x2 & op11_3_long=0x4 & op0_3_long=0x7 & REGD_LONG & REG1_LONG & REGBASE_OFFSET_PTR { performOrOp(REGD_LONG, REG1_LONG, REGBASE_OFFSET_PTR); }
+:XOR REGD_LONG, REG1_LONG, REGBASE_OFFSET_PTR is op14_2_long=0x2 & op11_3_long=0x5 & op0_3_long=0x7 & REGD_LONG & REG1_LONG & REGBASE_OFFSET_PTR { performXorOp(REGD_LONG, REG1_LONG, REGBASE_OFFSET_PTR); }
+:MOV REGD_LONG, REGBASE_OFFSET_PTR is op14_2_long=0x2 & op11_3_long=0x6 & op0_3_long=0x7 & REGD_LONG & REGBASE_OFFSET_PTR { REGD_LONG = REGBASE_OFFSET_PTR; calculateStatusFlags(REGD_LONG); }
+:MUL REGD_LONG, REG1_LONG, REGBASE_OFFSET_PTR is op14_2_long=0x2 & op11_3_long=0x7 & op0_3_long=0x7 & REGD_LONG & REG1_LONG & REGBASE_OFFSET_PTR { performMulOp(REGD_LONG, REG1_LONG, REGBASE_OFFSET_PTR); }

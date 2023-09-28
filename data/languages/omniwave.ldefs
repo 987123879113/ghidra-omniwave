@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<language_definitions>
+   <language processor="Samsung Omniwave"
+            endian="big"
+            size="16"
+            variant="default"
+            version="1.0"
+            slafile="omniwave.sla"
+            processorspec="omniwave.pspec"
+            id="omniwave:BE:16:default">
+    <description>Samsung Omniwave</description>
+    <compiler name="default" spec="omniwave.cspec" id="default"/>
+  </language> 
+</language_definitions>
