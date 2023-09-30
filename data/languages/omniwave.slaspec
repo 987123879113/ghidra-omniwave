@@ -282,11 +282,11 @@ macro performBitClearOp(dest, a, b) {
         goto REL;
 }
 
-:BLES REL is op14_2=0x0 & bits10_4=0xc & REL {
+:BGES REL is op14_2=0x0 & bits10_4=0xc & REL {
     if (($(Z_flag) != 0) || (($(N_flag) != 0) && ($(V_flag) == 0)) || (($(V_flag) != 0) && ($(N_flag) == 0)))
         goto REL;
 }
-:BGES REL is op14_2=0x0 & bits10_4=0xd & REL {
+:BLES REL is op14_2=0x0 & bits10_4=0xd & REL {
     if ((($(N_flag) != 0) && ($(V_flag) != 0)) || (($(V_flag) == 0) && ($(N_flag) == 0)))
         goto REL;
 }
